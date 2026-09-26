@@ -1,8 +1,10 @@
 # Aerie
 
-A quiet room to make a song. Raven Flock.
+**Raven Flock** — *Consider the ravens.*
 
-Live: https://dust2ash7.github.io/Aerie/
+A quiet room to make a song.
+
+**Live:** https://dust2ash7.github.io/Aerie/
 
 ## Run
 
@@ -20,3 +22,8 @@ npm run pages
 ```
 
 The static build lands in `docs/` with base `/Aerie/` for GitHub Pages (main branch, `/docs`).
+
+---
+
+Raven Flock — quiet tools.  
+*Consider the ravens.* · A reminder you are not forgotten.

@@ -1,8 +1,8 @@
 import {
   fadeAt,
   floorSnap,
+  dynamicsAt,
   knobsAt,
-  laneAt,
   snap,
   songBeats,
   songEnd,
@@ -26,6 +26,7 @@ export type Transport = "stopped" | "playing" | "recording" | "countin";
 type Hooks = {
   getProject: () => Project;
   getArmed: () => string | null;
+  getSelectedClipId: () => string | null;
   onTransport: (t: Transport) => void;
   onBeforeTake: () => void;
   onTake: (clip: Clip) => void;
@@ -55,7 +56,7 @@ type Mix = {
   nodes: Map<string, TrackNodes>;
 };
 
-const REV: Record<Exclude<ReverbSize, "off">, number> = { small: 0.16, room: 0.26, hall: 0.34 };
+const REV: Record<Exclude<ReverbSize, "off">, number> = { small: 0.14, shelf: 0.18, room: 0.26, trail: 0.22, hall: 0.34 };
 
 function setAt(param: AudioParam, value: number, when: number) {
   const t = Math.max(0, when);
@@ -141,11 +142,15 @@ function createMix(ctx: BaseAudioContext, dest: AudioNode, project: Project): Mi
 
   const conv: Record<Exclude<ReverbSize, "off">, ConvolverNode> = {
     small: ctx.createConvolver(),
+    shelf: ctx.createConvolver(),
     room: ctx.createConvolver(),
+    trail: ctx.createConvolver(),
     hall: ctx.createConvolver(),
   };
   conv.small.buffer = makeImpulse(ctx, 0.45, 3);
+  conv.shelf.buffer = makeImpulse(ctx, 0.62, 2.8); // short clear seam — Creek Shelf
   conv.room.buffer = makeImpulse(ctx, 1.15, 2.2);
+  conv.trail.buffer = makeImpulse(ctx, 1.55, 2.0); // mid soft beauty, softer than hall
   conv.hall.buffer = makeImpulse(ctx, 2.2, 1.7);
   (Object.keys(conv) as (keyof typeof conv)[]).forEach((k) => {
     const hp = ctx.createBiquadFilter();
@@ -171,12 +176,16 @@ function createMix(ctx: BaseAudioContext, dest: AudioNode, project: Project): Mi
     input.connect(low).connect(high).connect(gain).connect(auto).connect(pan).connect(master);
     const sends = {
       small: ctx.createGain(),
+      shelf: ctx.createGain(),
       room: ctx.createGain(),
+      trail: ctx.createGain(),
       hall: ctx.createGain(),
       delay: ctx.createGain(),
     };
     auto.connect(sends.small).connect(conv.small);
+    auto.connect(sends.shelf).connect(conv.shelf);
     auto.connect(sends.room).connect(conv.room);
+    auto.connect(sends.trail).connect(conv.trail);
     auto.connect(sends.hall).connect(conv.hall);
     auto.connect(sends.delay).connect(delay);
     inputs.set(track.id, input);
@@ -200,9 +209,9 @@ function applyMix(mix: Mix, project: Project, masterVol: number, when: number) {
     setAt(n.pan.pan, track.pan, when);
     setAt(n.low.gain, track.eqLow, when);
     setAt(n.high.gain, track.eqHigh, when);
-    const auto = track.lane && track.lane.length ? laneAt(track.lane, 0) : 1;
+    const auto = dynamicsAt(track.lane, 0, track.laneOn);
     setAt(n.auto.gain, Math.max(0.0001, auto), when);
-    (["small", "room", "hall"] as const).forEach((k) => {
+    (["small", "shelf", "room", "trail", "hall"] as const).forEach((k) => {
       setAt(n.sends[k].gain, track.reverb === k ? REV[k] : 0, when);
     });
     setAt(n.sends.delay.gain, track.delay ? 0.28 : 0, when);
@@ -445,7 +454,7 @@ function scheduleClip(
     const beat = swingBeat(abs, swing, drum);
     const when = Math.max(ctx.currentTime, origin + beat * spb);
     const dur = Math.max(0.05, note.duration * spb);
-    playNote(ctx, dest, when, note.pitch, note.velocity * fadeAt(clip, abs), dur, track.kind, track.preset, clipKnobs(track, clip, abs));
+    playNote(ctx, dest, when, note.pitch, note.velocity * fadeAt(clip, abs), dur, track.kind, track.preset, clipKnobs(track, clip, abs), clip.articulation ?? "legato");
   });
 }
 
@@ -517,6 +526,7 @@ class Engine {
       throw new Error("engine not attached");
     },
     getArmed: () => null,
+    getSelectedClipId: () => null,
     onTransport: () => undefined,
     onBeforeTake: () => undefined,
     onTake: () => undefined,
@@ -686,7 +696,10 @@ class Engine {
     if (!track || !dest) return;
     const key = `${trackId}:${midi}`;
     this.held.get(key)?.release(this.ctx.currentTime);
-    const voice = playNote(this.ctx, dest, this.ctx.currentTime, midi, velocity, null, track.kind, track.preset, track.knobs);
+    const sel = this.hooks.getSelectedClipId();
+    const clip = project.clips.find((c) => c.id === sel && c.trackId === trackId) ?? project.clips.find((c) => c.trackId === trackId);
+    const art = clip?.articulation ?? "legato";
+    const voice = playNote(this.ctx, dest, this.ctx.currentTime, midi, velocity, null, track.kind, track.preset, track.knobs, art);
     this.held.set(key, voice);
     this.alloc(voice, this.ctx.currentTime + 8);
     this.captureOn(track, midi, velocity, null);
@@ -741,7 +754,7 @@ class Engine {
     const track = project.tracks.find((t) => t.id === trackId);
     const dest = this.inputFor(trackId);
     if (!track || !dest) return;
-    const voice = playNote(this.ctx, dest, this.ctx.currentTime, midi, velocity, 0.3, "drums", "kit");
+    const voice = playNote(this.ctx, dest, this.ctx.currentTime, midi, velocity, 0.3, "drums", track.preset || "kit");
     this.alloc(voice, this.ctx.currentTime + 1.4);
     this.captureOn(track, midi, velocity, 0.12);
   }
@@ -1031,7 +1044,7 @@ class Engine {
     for (const track of project.tracks) {
       const node = this.mix.nodes.get(track.id);
       if (!node) continue;
-      const v = track.lane && track.lane.length ? laneAt(track.lane, from) : 1;
+      const v = dynamicsAt(track.lane, from, track.laneOn);
       setAt(node.auto.gain, Math.max(0.0001, v), now);
     }
     const barNow = Math.floor(from / project.timeSig);
@@ -1165,7 +1178,7 @@ class Engine {
       const when = Math.max(this.ctx!.currentTime, this.timeAt(beat));
       const dur = Math.max(0.05, note.duration * (60 / this.bpm));
       try {
-        const voice = playNote(this.ctx!, dest, when, note.pitch, note.velocity * fadeAt(clip, abs), dur, track.kind, track.preset, clipKnobs(track, clip, abs));
+        const voice = playNote(this.ctx!, dest, when, note.pitch, note.velocity * fadeAt(clip, abs), dur, track.kind, track.preset, clipKnobs(track, clip, abs), clip.articulation ?? "legato");
         this.fired.add(key);
         this.alloc(voice, when + dur + 0.3, when);
       } catch {

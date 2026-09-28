@@ -13,7 +13,14 @@ npm install
 npm run dev
 ```
 
-Open the studio, pick Lo-fi evening, Piano sketch, or an empty room. Songs stay in this browser.
+Open the studio, pick **Tend bed** or **Done chime** for Soft Mastery game audio, or Lo-fi evening / Piano sketch / Empty room. Songs stay in this browser.
+
+### Ship to a Raven Flock game
+1. Tone: Quiet · kit off for tend beds  
+2. Check the loop seam (no riser into the loop point)  
+3. Name files `{title}-{role}.wav` — bed · bed-mature · chime  
+4. Export via **Ship** / Game pack (mix WAV + stems + project JSON)  
+5. Consider the ravens — the song remembers the place.
 
 ## Pages
 

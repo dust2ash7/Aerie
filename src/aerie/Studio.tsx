@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Download, Minus, Pause, Play, Plus, Redo2, Settings, Share2, Square, Undo2 } from "lucide-react";
-import { emptyRoom, formatPosition, KEYS, lofiEvening, pianoSketch, type SnapMode, type ToneName } from "@/aerie/model";
+import { doneChime, emptyRoom, formatPosition, KEYS, lofiEvening, pianoSketch, tendBed, type SnapMode, type ToneName } from "@/aerie/model";
 import { engine } from "@/aerie/engine";
 import { bootAerie, useAerie } from "@/aerie/store";
 import { Arrange } from "@/aerie/Arrange";
@@ -34,6 +34,8 @@ function Home() {
       <div className="empty-main">
         <h1>A quiet room to make a song.</h1>
         <div className="cards">
+          <TemplateCard title="Tend bed" detail="Quiet Soft Mastery bed — pad, keys, sparks, pedal. No kit." meta="69" onPick={() => load(tendBed())} />
+          <TemplateCard title="Done chime" detail="Short Soft Mastery one-shot. Loop off." meta="1s" onPick={() => load(doneChime())} />
           <TemplateCard title="Lo-fi evening" detail="Drums, bass, and a warm chord bed." meta="84" onPick={() => load(lofiEvening())} />
           <TemplateCard title="Piano sketch" detail="A few chords and a melody." meta="76" onPick={() => load(pianoSketch())} />
           <TemplateCard title="Empty room" detail="Piano, eight bars, nothing else." meta="120" onPick={() => load(emptyRoom())} />
@@ -83,6 +85,8 @@ function Empty() {
       <div className="empty-main">
         <h1>A quiet room to make a song.</h1>
         <div className="cards">
+          <TemplateCard title="Tend bed" detail="Quiet Soft Mastery bed — pad, keys, sparks, pedal. No kit." meta="69" onPick={() => load(tendBed())} />
+          <TemplateCard title="Done chime" detail="Short Soft Mastery one-shot. Loop off." meta="1s" onPick={() => load(doneChime())} />
           <TemplateCard title="Lo-fi evening" detail="Drums, bass, and a warm chord bed." meta="84" onPick={() => load(lofiEvening())} />
           <TemplateCard title="Piano sketch" detail="A few chords and a melody." meta="76" onPick={() => load(pianoSketch())} />
           <TemplateCard title="Empty room" detail="Piano, eight bars, nothing else." meta="120" onPick={() => load(emptyRoom())} />
@@ -114,6 +118,7 @@ function Shell() {
   const settingsOpen = useAerie((s) => s.settingsOpen);
   const pickerOpen = useAerie((s) => s.pickerOpen);
   const templatesOpen = useAerie((s) => s.templatesOpen);
+  const gameExportOpen = useAerie((s) => s.gameExportOpen);
   const toast = useAerie((s) => s.toast);
   const shareUrl = useAerie((s) => s.shareUrl);
   const exporting = useAerie((s) => s.exporting);
@@ -390,8 +395,8 @@ function Shell() {
         <button type="button" className={bottom === "mixer" ? "text-btn on" : "text-btn"} onClick={() => useAerie.getState().setBottom("mixer")}>
           Mix
         </button>
-        <button type="button" className="text-btn" disabled={exporting} onClick={() => void useAerie.getState().exportWav(!!project.loop)}>
-          <Download size={14} /> {exporting ? "Exporting…" : "Export WAV"}
+        <button type="button" className="text-btn" disabled={exporting} onClick={() => useAerie.setState({ gameExportOpen: true })}>
+          <Download size={14} /> Ship
         </button>
         <button type="button" className="icon-btn" aria-label="Share link" onClick={() => void useAerie.getState().share()}>
           <Share2 size={15} />
@@ -439,11 +444,8 @@ function Shell() {
             <option value="present">Present</option>
           </select>
         </label>
-        <button type="button" className="text-btn" onClick={() => void useAerie.getState().exportStems()}>
-          Stems
-        </button>
-        <button type="button" className="text-btn" onClick={() => useAerie.getState().exportJson()}>
-          JSON
+        <button type="button" className="text-btn" onClick={() => useAerie.setState({ gameExportOpen: true })}>
+          Game pack
         </button>
         <label className="text-btn">
           Import
@@ -549,6 +551,7 @@ function Shell() {
       {toast ? <div className="toast">{toast}</div> : null}
       {pickerOpen ? <Picker /> : null}
       {templatesOpen ? <TemplateSheet /> : null}
+      {gameExportOpen ? <GameExportSheet /> : null}
       {shareUrl ? (
         <div className="overlay" onPointerDown={() => useAerie.setState({ shareUrl: null })}>
           <div className="dialog share-dialog" onPointerDown={(e) => e.stopPropagation()}>
@@ -578,10 +581,58 @@ function TemplateSheet() {
           </button>
         </header>
         <div className="cards in-dialog">
+          <TemplateCard title="Tend bed" detail="Quiet Soft Mastery bed — pad, keys, sparks, pedal. No kit." meta="69" onPick={() => load(tendBed())} />
+          <TemplateCard title="Done chime" detail="Short Soft Mastery one-shot. Loop off." meta="1s" onPick={() => load(doneChime())} />
           <TemplateCard title="Lo-fi evening" detail="Drums, bass, and a warm chord bed." meta="84" onPick={() => load(lofiEvening())} />
           <TemplateCard title="Piano sketch" detail="A few chords and a melody." meta="76" onPick={() => load(pianoSketch())} />
           <TemplateCard title="Empty room" detail="Piano, eight bars, nothing else." meta="120" onPick={() => load(emptyRoom())} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+function GameExportSheet() {
+  const exporting = useAerie((s) => s.exporting);
+  const project = useAerie((s) => s.project);
+  const close = () => useAerie.setState({ gameExportOpen: false });
+  return (
+    <div className="overlay" onPointerDown={close}>
+      <div className="dialog game-export" onPointerDown={(e) => e.stopPropagation()} role="dialog" aria-label="Ship to a Raven Flock game">
+        <header>
+          <h2>Ship to a Raven Flock game</h2>
+          <button type="button" className="icon-btn" onClick={close} aria-label="Close">
+            ×
+          </button>
+        </header>
+        <ol className="export-checklist">
+          <li>Tone: Quiet</li>
+          <li>Kit off for tend beds</li>
+          <li>Check the loop seam (no riser into the loop point)</li>
+          <li>Name files {"{title}-{role}"}.wav — bed · bed-mature · chime</li>
+          <li>Bed quieter than SFX; chime one-shot, loop off</li>
+        </ol>
+        <div className="export-actions">
+          <button
+            type="button"
+            className="text-btn on"
+            disabled={exporting}
+            onClick={() => void useAerie.getState().exportWav(!!project.loop)}
+          >
+            Export game bed (WAV)
+          </button>
+          <button type="button" className="text-btn" disabled={exporting} onClick={() => void useAerie.getState().exportStems()}>
+            Export stems
+          </button>
+          <button type="button" className="text-btn" disabled={exporting} onClick={() => useAerie.getState().exportJson()}>
+            Export project
+          </button>
+          <button type="button" className="text-btn" disabled={exporting} onClick={() => void useAerie.getState().exportGamePack()}>
+            Mix + stems + JSON
+          </button>
+        </div>
+        <p className="quiet export-tip">Consider the ravens — the song remembers the place.</p>
       </div>
     </div>
   );

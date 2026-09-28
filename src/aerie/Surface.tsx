@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { DRUMS, KNOBS, PRESETS, chordPitches, nearestInScale, presetName, roman, scaleSet, smartFigure, uid, type Clip, type Note, type Track } from "@/aerie/model";
+import { ARTICULATIONS, ARTICULATION_PRESETS, DRUMS, KNOBS, PRESETS, chordPitches, nearestInScale, presetName, roman, scaleSet, smartFigure, uid, type Clip, type Note, type Track } from "@/aerie/model";
 import { engine } from "@/aerie/engine";
 import { useAerie } from "@/aerie/store";
 
@@ -56,6 +56,7 @@ export function Surface() {
           </div>
         ) : null}
       </div>
+      <ArticBar track={track} />
       {track.kind === "drums" ? (
         <Drums track={track} onWrite={(clip) => putClip(clip, true)} />
       ) : track.kind === "audio" ? (
@@ -401,6 +402,55 @@ function ChordStrip({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+
+function ArticBar({ track }: { track: Track }) {
+  const project = useAerie((s) => s.project);
+  const selectedClipId = useAerie((s) => s.selectedClipId);
+  if (!ARTICULATION_PRESETS.has(track.preset)) return null;
+  const clip =
+    project.clips.find((c) => c.id === selectedClipId && c.trackId === track.id) ??
+    project.clips.find((c) => c.trackId === track.id) ??
+    null;
+  const current = clip?.articulation ?? "legato";
+  return (
+    <div className="art-bar">
+      <span>Articulation</span>
+      {ARTICULATIONS.map((a) => (
+        <button
+          key={a}
+          type="button"
+          className={current === a ? "chip on" : "chip"}
+          onClick={() => {
+            if (clip) useAerie.getState().patchClip({ ...clip, articulation: a });
+            else {
+              // Seed a silent clip so live play has an artic without rewriting notes later
+              const seed: Clip = {
+                id: uid("clip"),
+                trackId: track.id,
+                name: "Artic",
+                start: 0,
+                length: project.timeSig,
+                content: project.timeSig,
+                loop: false,
+                notes: [],
+                mute: false,
+                fadeIn: 0,
+                fadeOut: 0,
+                active: true,
+                clipKind: "midi",
+                articulation: a,
+              };
+              useAerie.getState().putClip(seed, true);
+            }
+          }}
+        >
+          {a}
+        </button>
+      ))}
     </div>
   );
 }

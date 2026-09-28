@@ -1,7 +1,8 @@
 export type TrackKind = "drums" | "keys" | "bass" | "lead" | "audio";
 export type Scale = "major" | "minor";
 export type TimeSig = 3 | 4;
-export type ReverbSize = "off" | "small" | "room" | "hall";
+export type ReverbSize = "off" | "small" | "shelf" | "room" | "trail" | "hall";
+export type Articulation = "legato" | "soft" | "pizz" | "trem";
 export type Tint = "sage" | "clay" | "slate" | "stone" | "ink" | "olive" | "dust" | "sea";
 export type Flavor = "diatonic" | "major" | "minor" | "7";
 export type Category = "Drums" | "Bass" | "Keys" | "Texture";
@@ -41,6 +42,7 @@ export type Clip = {
   audioOffset?: number;
   clipKind?: "midi" | "audio";
   knobLane?: KnobPoint[];
+  articulation?: Articulation;
 };
 
 export type Track = {
@@ -108,7 +110,7 @@ export type Settings = {
   midiEcho?: boolean;
 };
 
-export const MAX_TRACKS = 8;
+export const MAX_TRACKS = 12;
 export const MAX_MINUTES = 4;
 export const SNAP = 0.25;
 export const SCENE_ROWS: SceneRow[] = ["drums", "bass", "keys", "lead"];
@@ -130,6 +132,16 @@ export const KNOBS: Record<string, [string, string, string]> = {
   bell: ["Tone", "Decay", "Space"],
   guitar: ["Tone", "Decay", "Space"],
   kit: ["Punch", "Hat decay", "Room"],
+  kit_soft: ["Soft", "Hat decay", "Room"],
+  pad_choir: ["Attack", "Breath", "Wash"],
+  pad_bow: ["Attack", "Bow", "Wash"],
+  strings_ens: ["Tone", "Decay", "Wash"],
+  strings_solo: ["Tone", "Decay", "Space"],
+  mallet: ["Tone", "Decay", "Space"],
+  flute: ["Breath", "Tone", "Space"],
+  clarinet: ["Tone", "Reed", "Space"],
+  horn: ["Soft", "Tone", "Space"],
+  choir: ["Attack", "Vowels", "Wash"],
   file: ["Gain", "Tone", "Room"],
 };
 
@@ -158,7 +170,12 @@ export const PRESETS: Record<TrackKind, { id: string; name: string }[]> = {
     { id: "ep", name: "Electric Piano" },
     { id: "organ", name: "Warm Organ" },
     { id: "pad", name: "Analog Pad" },
+    { id: "pad_choir", name: "Soft Choir Pad" },
+    { id: "pad_bow", name: "Bowed Pad" },
     { id: "strings", name: "Strings" },
+    { id: "strings_ens", name: "Ensemble Sustain" },
+    { id: "strings_solo", name: "Soft Solo" },
+    { id: "choir", name: "Wordless Choir" },
     { id: "pluck", name: "Pluck" },
   ],
   bass: [
@@ -169,11 +186,41 @@ export const PRESETS: Record<TrackKind, { id: string; name: string }[]> = {
   lead: [
     { id: "lead", name: "Analog Lead" },
     { id: "bell", name: "Bell" },
+    { id: "mallet", name: "Soft Mallet" },
+    { id: "flute", name: "Soft Flute" },
+    { id: "clarinet", name: "Soft Clarinet" },
+    { id: "horn", name: "Soft Horn" },
     { id: "guitar", name: "Guitar-ish Pluck" },
   ],
-  drums: [{ id: "kit", name: "Drum Kit" }],
+  drums: [
+    { id: "kit", name: "Drum Kit" },
+    { id: "kit_soft", name: "Soft Kit" },
+  ],
   audio: [{ id: "file", name: "Audio" }],
 };
+
+/** Presets that expose articulation selector (legato / soft / pizz / trem). */
+export const ARTICULATION_PRESETS = new Set([
+  "strings",
+  "strings_ens",
+  "strings_solo",
+  "flute",
+  "clarinet",
+  "horn",
+  "choir",
+  "pad_bow",
+]);
+
+export const REVERB_OPTIONS: { id: ReverbSize; name: string }[] = [
+  { id: "off", name: "Off" },
+  { id: "small", name: "Small" },
+  { id: "shelf", name: "Shelf" },
+  { id: "room", name: "Room" },
+  { id: "trail", name: "Trail" },
+  { id: "hall", name: "Hall" },
+];
+
+export const ARTICULATIONS: Articulation[] = ["legato", "soft", "pizz", "trem"];
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 const MINOR = [0, 2, 3, 5, 7, 8, 10];
@@ -450,6 +497,102 @@ export function pianoSketch(): Project {
   });
 }
 
+
+export function tendBed(): Project {
+  const pad = createTrack("keys", "pad_choir", "Pad", 0);
+  pad.volume = 0.62;
+  pad.reverb = "shelf";
+  pad.laneOn = true;
+  pad.lane = [
+    { t: 0, v: 0.55 },
+    { t: 16, v: 0.92 },
+    { t: 28, v: 0.7 },
+  ];
+  const keys = createTrack("keys", "ep", "Keys", 1);
+  keys.volume = 0.55;
+  keys.reverb = "shelf";
+  const sparks = createTrack("keys", "piano", "Sparks", 2);
+  sparks.volume = 0.42;
+  sparks.reverb = "small";
+  const pedal = createTrack("bass", "sub", "Pedal", 3);
+  pedal.volume = 0.48;
+  pedal.reverb = "off";
+  const padNotes = [
+    ...[60, 67, 72].map((p) => note(p, 0, 7.5, 0.42)),
+    ...[57, 64, 69].map((p) => note(p, 8, 7.5, 0.4)),
+    ...[53, 60, 67].map((p) => note(p, 16, 7.5, 0.38)),
+    ...[55, 62, 67].map((p) => note(p, 24, 7.5, 0.4)),
+  ];
+  const epNotes = [
+    ...[60, 64, 67].map((p) => note(p, 0, 3.5, 0.5)),
+    ...[57, 60, 64].map((p) => note(p, 8, 3.5, 0.48)),
+    ...[53, 57, 60].map((p) => note(p, 16, 3.5, 0.46)),
+    ...[55, 59, 62].map((p) => note(p, 24, 3.5, 0.48)),
+  ];
+  const sparkNotes = [
+    note(72, 4, 0.75, 0.38),
+    note(74, 12.5, 0.6, 0.34),
+    note(71, 20, 0.8, 0.36),
+    note(67, 28.5, 1, 0.32),
+  ];
+  const pedalNotes = [
+    note(36, 0, 7.5, 0.55),
+    note(33, 8, 7.5, 0.5),
+    note(29, 16, 7.5, 0.48),
+    note(31, 24, 7.5, 0.5),
+  ];
+  const padClip = makeClip(pad.id, "Pad hold", 0, 32, 32, padNotes, true);
+  padClip.fadeIn = 0.5;
+  padClip.fadeOut = 0.5;
+  const keysClip = makeClip(keys.id, "Soft chords", 0, 32, 32, epNotes, true);
+  keysClip.fadeIn = 0.25;
+  keysClip.fadeOut = 0.35;
+  const sparkClip = makeClip(sparks.id, "Sparks", 0, 32, 32, sparkNotes, true);
+  sparkClip.fadeIn = 0.05;
+  sparkClip.fadeOut = 0.15;
+  const pedalClip = makeClip(pedal.id, "Pedal", 0, 32, 32, pedalNotes, true);
+  pedalClip.fadeIn = 0.4;
+  pedalClip.fadeOut = 0.4;
+  return fillProject({
+    v: 1,
+    title: "Tend bed",
+    bpm: 69,
+    timeSig: 4,
+    key: "C",
+    scale: "major",
+    bars: 8,
+    swing: 0,
+    tone: "quiet",
+    loop: { start: 0, end: 32 },
+    tracks: [pad, keys, sparks, pedal],
+    clips: [padClip, keysClip, sparkClip, pedalClip],
+  });
+}
+
+export function doneChime(): Project {
+  const chime = createTrack("lead", "bell", "Chime", 0);
+  chime.volume = 0.72;
+  chime.reverb = "small";
+  const notes = [note(76, 0, 0.55, 0.62), note(83, 0.08, 0.5, 0.48)];
+  const clip = makeClip(chime.id, "Done", 0, 2, 2, notes, false);
+  clip.fadeIn = 0.02;
+  clip.fadeOut = 0.12;
+  return fillProject({
+    v: 1,
+    title: "Done chime",
+    bpm: 69,
+    timeSig: 4,
+    key: "C",
+    scale: "major",
+    bars: 2,
+    swing: 0,
+    tone: "quiet",
+    loop: null,
+    tracks: [chime],
+    clips: [clip],
+  });
+}
+
 export type LoopDef = {
   id: string;
   name: string;
@@ -576,6 +719,7 @@ export function fillProject(input: Project): Project {
       fadeOut: c.fadeOut ?? 0,
       active: c.active ?? true,
       clipKind: c.clipKind ?? (c.assetId ? "audio" : "midi"),
+      articulation: c.articulation ?? "legato",
     })),
   };
   return withBars(p);
@@ -638,6 +782,12 @@ export function laneAt(points: Point[] | undefined, beat: number): number {
     }
   }
   return 1;
+}
+
+/** Soft Mastery dynamics: clamp volume-lane multiplier to 0.35–1.0 (swell, not mute gate). */
+export function dynamicsAt(points: Point[] | undefined, beat: number, laneOn?: boolean): number {
+  if (!laneOn || !points || points.length === 0) return 1;
+  return Math.max(0.35, Math.min(1, laneAt(points, beat)));
 }
 
 export function knobsAt(base: [number, number, number], lane: KnobPoint[] | undefined, localBeat: number): [number, number, number] {

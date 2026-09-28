@@ -1,8 +1,11 @@
 import { useRef, useState } from "react";
 import {
+  ARTICULATIONS,
+  ARTICULATION_PRESETS,
   DRUMS,
   LOOPS,
   PRESETS,
+  REVERB_OPTIONS,
   SNAP,
   nearestInScale,
   snap,
@@ -89,16 +92,17 @@ export function Mixer() {
             />
           </label>
           <label>
-            Reverb
+            Space
             <select
               value={track.reverb}
-              aria-label={`${track.name} reverb`}
+              aria-label={`${track.name} space`}
               onChange={(e) => patchTrack(track.id, { reverb: e.target.value as ReverbSize })}
             >
-              <option value="off">Off</option>
-              <option value="small">Small</option>
-              <option value="room">Room</option>
-              <option value="hall">Hall</option>
+              {REVERB_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -108,8 +112,8 @@ export function Mixer() {
           >
             Delay
           </button>
-          <button type="button" className={track.laneOn ? "text-btn on" : "text-btn"} onClick={() => useAerie.getState().toggleLane(track.id)}>
-            Lane
+          <button type="button" className={track.laneOn ? "text-btn on" : "text-btn"} onClick={() => useAerie.getState().toggleLane(track.id)} title="Dynamics swell 0.35–1.0">
+            Dynamics
           </button>
           <button type="button" className="text-btn danger" onClick={() => removeTrack(track.id)}>
             Remove
@@ -176,9 +180,13 @@ export function Picker() {
   const close = () => useAerie.getState().setPicker(false);
   const tiles: { kind: Track["kind"]; preset: string; name: string; blurb: string }[] = [
     { kind: "drums", preset: "kit", name: "Drum Kit", blurb: "Pads and a one-bar step loop." },
-    { kind: "keys", preset: "piano", name: "Keys", blurb: "Piano, organ, pad, strings." },
+    { kind: "drums", preset: "kit_soft", name: "Soft Kit", blurb: "Quieter hits — texture without arcade." },
+    { kind: "keys", preset: "piano", name: "Keys", blurb: "Piano, organ, pads, strings, choir." },
+    { kind: "keys", preset: "pad_choir", name: "Choir Pad", blurb: "Soft Mastery wordless pad." },
+    { kind: "keys", preset: "strings_ens", name: "Ensemble", blurb: "Wider string sustain wash." },
     { kind: "bass", preset: "finger", name: "Bass", blurb: "Finger, synth, or 808 sub." },
-    { kind: "lead", preset: "lead", name: "Lead", blurb: "Analog, bell, or a soft pluck." },
+    { kind: "lead", preset: "flute", name: "Winds", blurb: "Flute, clarinet, soft horn, mallet." },
+    { kind: "lead", preset: "bell", name: "Bell / Mallet", blurb: "Done-chimes and soft settles." },
     { kind: "audio", preset: "file", name: "Audio", blurb: "A file or the microphone." },
     { kind: "keys", preset: "piano", name: "Smart Chords", blurb: "Tap a chord in the song key." },
   ];
@@ -227,7 +235,27 @@ export function PianoRoll() {
   if (!clip || !track) {
     return <div className="roll-empty">Select a clip to edit notes.</div>;
   }
-  return <RollBody clip={clip} track={track} selectedNoteId={selectedNoteId} selectNote={selectNote} pushHistory={pushHistory} setNotes={setNotes} />;
+  const showArt = ARTICULATION_PRESETS.has(track.preset);
+  return (
+    <div className="roll-wrap">
+      {showArt ? (
+        <div className="art-bar">
+          <span>Articulation</span>
+          {ARTICULATIONS.map((a) => (
+            <button
+              key={a}
+              type="button"
+              className={(clip.articulation ?? "legato") === a ? "chip on" : "chip"}
+              onClick={() => useAerie.getState().patchClip({ ...clip, articulation: a })}
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <RollBody clip={clip} track={track} selectedNoteId={selectedNoteId} selectNote={selectNote} pushHistory={pushHistory} setNotes={setNotes} />
+    </div>
+  );
 }
 
 function RollBody({

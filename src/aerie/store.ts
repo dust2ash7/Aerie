@@ -75,6 +75,7 @@ type State = {
   settingsOpen: boolean;
   pickerOpen: boolean;
   templatesOpen: boolean;
+  gameExportOpen: boolean;
   notesOpen: boolean;
   helpOpen: boolean;
   zoomBars: number;
@@ -174,6 +175,7 @@ type State = {
   importMidiFile: (file: File) => Promise<void>;
   toggleMic: () => Promise<void>;
   exportJson: () => void;
+  exportGamePack: () => Promise<void>;
   importJson: (file: File) => Promise<void>;
   connectMidi: () => Promise<void>;
   saveNow: () => void;
@@ -212,6 +214,7 @@ export const useAerie = create<State>((set, get) => ({
   settingsOpen: false,
   pickerOpen: false,
   templatesOpen: false,
+  gameExportOpen: false,
   notesOpen: false,
   helpOpen: false,
   zoomBars: 8,
@@ -345,7 +348,7 @@ export const useAerie = create<State>((set, get) => ({
   addTrack: (kind, preset, name) => {
     const s = get();
     if (s.project.tracks.length >= MAX_TRACKS) {
-      show("Eight tracks is the room’s limit.");
+      show("Soft Mastery beds stay sparse — 12 is the ceiling, not a target.");
       return null;
     }
     const track = createTrack(kind, preset, name, s.project.tracks.length);
@@ -388,7 +391,7 @@ export const useAerie = create<State>((set, get) => ({
     const track = s.project.tracks.find((t) => t.id === id);
     if (!track) return;
     if (s.project.tracks.length >= MAX_TRACKS) {
-      show("Eight tracks is the room’s limit.");
+      show("Soft Mastery beds stay sparse — 12 is the ceiling, not a target.");
       return;
     }
     const copy: Track = { ...track, id: uid("trk"), name: `${track.name} copy`.slice(0, 24), solo: false };
@@ -489,6 +492,7 @@ export const useAerie = create<State>((set, get) => ({
       baseMidi: defaultBase(next.tracks[0]?.kind ?? "keys"),
       bottom: "instrument",
       templatesOpen: false,
+  gameExportOpen: false,
       transport: "stopped",
       launched: [null, null, null, null],
       queued: [null, null, null, null],
@@ -786,7 +790,8 @@ export const useAerie = create<State>((set, get) => ({
         ...s.project,
         tracks: s.project.tracks.map((t) => {
           if (t.id !== trackId) return t;
-          const lane = [...(t.lane ?? []).filter((p) => Math.abs(p.t - point.t) > 0.05), point].sort((a, b) => a.t - b.t);
+          const clamped = { ...point, v: Math.max(0.35, Math.min(1, point.v)) };
+          const lane = [...(t.lane ?? []).filter((p) => Math.abs(p.t - clamped.t) > 0.05), clamped].sort((a, b) => a.t - b.t);
           return { ...t, lane };
         }),
       },
@@ -991,6 +996,41 @@ export const useAerie = create<State>((set, get) => ({
     const blob = new Blob([JSON.stringify(project)], { type: "application/json" });
     downloadBlob(blob, `${safeName(project.title)}.json`);
   },
+  exportGamePack: async () => {
+    const s = get();
+    if (s.exporting) return;
+    const title = safeName(s.project.title);
+    const loop = s.project.loop && s.project.loop.end > s.project.loop.start ? s.project.loop : null;
+    set({ exporting: true, exportLabel: "Game pack…", exportProgress: 0.05 });
+    try {
+      const mix = await renderWav(s.project, s.settings.master, {
+        region: loop,
+        onProgress: (phase, value) => set({ exportLabel: phase === "write" ? "Writing mix…" : "Rendering mix…", exportProgress: value * 0.4 }),
+      });
+      downloadBlob(mix, `${title}-bed.wav`);
+      set({ exportLabel: "Rendering stems…", exportProgress: 0.45 });
+      const stems = await renderStems(s.project, s.settings.master, {
+        region: loop,
+        onProgress: (_p, value) => set({ exportLabel: "Rendering stems…", exportProgress: 0.45 + value * 0.4 }),
+      });
+      for (const stem of stems) downloadBlob(stem.blob, `${title}-stem-${safeName(stem.name)}.wav`);
+      const meta = {
+        ...s.project,
+        gameExport: {
+          naming: "{title}-{role}.wav",
+          roles: ["bed", "bed-mature", "chime", "stem-{track}"],
+          tip: "Tone Quiet · kit off for tend beds · check loop seam · bed quieter than SFX",
+        },
+      };
+      downloadBlob(new Blob([JSON.stringify(meta, null, 2)], { type: "application/json" }), `${title}.json`);
+      set({ exportDone: true, exportProgress: 1 });
+      show("Game pack ready — mix, stems, and project.");
+    } catch (err) {
+      if ((err as Error).message !== "cancelled") show("Couldn't export. Try again.");
+    } finally {
+      set({ exporting: false, exportLabel: null });
+    }
+  },
   importJson: async (file) => {
     try {
       const data = JSON.parse(await file.text()) as unknown;
@@ -1067,7 +1107,7 @@ async function hydrateAssets(project: Project) {
 async function importAudioBlob(file: Blob, name: string) {
   const s = useAerie.getState();
   if (s.project.tracks.length >= MAX_TRACKS && !s.project.tracks.some((t) => t.kind === "audio")) {
-    show("Eight tracks is the room’s limit.");
+    show("Soft Mastery beds stay sparse — 12 is the ceiling, not a target.");
     return;
   }
   let track = s.project.tracks.find((t) => t.kind === "audio");
@@ -1145,6 +1185,7 @@ export function attachEngine() {
   engine.attach({
     getProject: () => useAerie.getState().project,
     getArmed: () => useAerie.getState().armedTrackId,
+    getSelectedClipId: () => useAerie.getState().selectedClipId,
     onTransport: (transport) => useAerie.setState({ transport }),
     onBeforeTake: () => useAerie.getState().onBeforeTake(),
     onTake: (clip) => useAerie.getState().onTake(clip),

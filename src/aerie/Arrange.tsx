@@ -316,7 +316,7 @@ export function Arrange() {
                     onPointerDown={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
                       const v = 1 - (e.clientY - rect.top) / Math.max(1, rect.height);
-                      useAerie.getState().putLanePoint(track.id, { t: snap(clientBeat(e.clientX)), v: Math.max(0, Math.min(1, v)) });
+                      useAerie.getState().putLanePoint(track.id, { t: snap(clientBeat(e.clientX)), v: Math.max(0.35, Math.min(1, v)) });
                     }}
                   >
                     {(track.lane ?? []).map((p) => (

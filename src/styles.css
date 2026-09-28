@@ -263,3 +263,11 @@
   .cards { grid-template-columns: 1fr; }
   .empty h1 { font-size: 36px; }
 }
+
+.export-checklist { margin: 8px 0 14px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.35; }
+.export-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.export-tip { margin: 0; font-size: 12px; opacity: 0.75; }
+.game-export { max-width: 420px; }
+.art-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 8px; font-size: 12px; }
+.roll-wrap { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.lane-auto::before { content: "Dynamics"; position: absolute; left: 4px; top: 2px; font-size: 9px; opacity: 0.55; pointer-events: none; }
